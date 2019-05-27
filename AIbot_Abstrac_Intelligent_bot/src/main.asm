@@ -15,7 +15,7 @@ INCLUDE macros.inc
 	falg				BYTE 20
 	;///////////////////////////////////////////////////
 	;filePath			 BYTE 50 DUP(0)
-	filePath			BYTE "C:\memory.txt",0
+	filePath			BYTE "..\memory.txt",0
 	;append
 	apend_word			 BYTE 200 DUP(0)
 	;Find
