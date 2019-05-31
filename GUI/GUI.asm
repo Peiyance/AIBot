@@ -18,6 +18,7 @@ includelib	shell32.lib
 
 WinMain 	proto :DWORD,:DWORD,:DWORD,:DWORD	;主窗口过程
 
+
 .data
 ClassName 		BYTE "WinClass",0
 AppName  		BYTE "Robot",0
@@ -29,6 +30,7 @@ ButtonTextClr 	BYTE "Clear",0
 ButtonTextTrain 	BYTE "Train",0
 ButtonTextRobot	BYTE "Robot",0
 ButtonTextHuman	BYTE "Human",0
+
 
 
 .data?
@@ -53,11 +55,13 @@ TextHumanID equ 5
 IDM_CLEAR 		equ 1
 IDM_APPENDTEXT 	equ 2
 
-.code
 
+.code
+extern initialize:proc ;;怪了，就是链接不上。求指教
 main	proc		
 	invoke GetModuleHandle, NULL
 	mov    hInstance,eax
+	;call initialize
 	invoke WinMain, hInstance, NULL, NULL, SW_SHOWDEFAULT
 	invoke ExitProcess,eax
 	ret
@@ -193,5 +197,4 @@ WndProc proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
 	xor    eax,eax
 	ret
 WndProc endp
-
 end main

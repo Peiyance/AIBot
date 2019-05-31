@@ -1,4 +1,0 @@
-﻿  Assembling src\main.asm...
-main.obj : warning LNK4258: 指令“/ENTRY:main@0”与开关“/ENTRY:main”不兼容；已忽略
-C:\masm32\lib\Irvine16.lib : warning LNK4003: 无效的库格式；已忽略库
-  Project.vcxproj -> C:\Users\MysriO\Documents\Github Files\AIbot\AIbot_Abstrac_Intelligent_bot\Debug\Project.exe
