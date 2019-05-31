@@ -1,12 +1,10 @@
 ;option casemap:none
 
 
-INCLUDE Irvine32.inc
-INCLUDE Macros.inc
+INCLUDE C:\masm32\include\Irvine32.inc
+INCLUDE C:\masm32\include\Macros.inc
 
-INCLUDELIB C:\masm32\lib\Irvine32.lib
-INCLUDELIB C:\masm32\lib\Irvine16.lib
-INCLUDELIB C:\masm32\lib\User32.lib
+;INCLUDELIB C:\masm32\lib\Irvine32.lib
 
 
 .DATA
