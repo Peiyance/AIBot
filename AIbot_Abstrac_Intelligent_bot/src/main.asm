@@ -1,5 +1,6 @@
 INCLUDE IRVINE32.INC
 INCLUDE macros.inc
+
 .DATA
 	hHeap				 HANDLE ?  ;handle holding the address of the heap
 	filehandle			 HANDLE ?  

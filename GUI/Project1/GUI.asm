@@ -2,12 +2,12 @@
 .model flat,stdcall
 option casemap:none
 
-include 	windows.inc
-include 	user32.inc
-include 	kernel32.inc
-include		masm32.inc
-include		comctl32.inc
-include		shell32.inc
+include 	C:/masm32/include/windows.inc
+include 	C:/masm32/include/user32.inc
+include 	C:/masm32/include/kernel32.inc
+include		C:/masm32/include/masm32.inc
+include		C:/masm32/include/comctl32.inc
+include		C:/masm32/include/shell32.inc
 
 includelib 	user32.lib
 includelib 	kernel32.lib
