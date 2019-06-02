@@ -1,5 +1,6 @@
 .386
 .model flat,stdcall
+option casemap:none
 
 INCLUDE IRVINE32.INC
 INCLUDE macros.inc
@@ -50,12 +51,12 @@ initialize proc
 	call getHandleHeap
 	call allocateArray
 	mWrite "Enter the path of the file: "
-	invoke CRLF
+	invoke Crlf
 	MOV EDX,OFFSET filePath
 	MOV ECX,SIZEOF filePath
 	;CALL ReadString
 	invoke Read, ADDR [filePath]
-	invoke CLRSCR
+	invoke Clrscr
 	ret
 initialize endp
 
@@ -66,67 +67,11 @@ main PROC
 
 		mWrite "YOU: "
 		CALL Find
-		CALL CRLF
+		CALL Crlf
 		JMP read_Function
 
-	;CALL CRLF
-	;mWrite "Please enter the number of the functions you want to perfrom:"
-	;CALL CRLF
-
-	;mWrite "(1)Read"
-	;CALL CRLF
-
-	;mWrite "(2)Display"
-	;CALL CRLF
-
-	;mWrite "(3)Append"
-	;CALL CRLF
-
-	;mWrite "(4)Find"
-	;CALL CRLF
-	;call readdec
-	;cmp EAX, 2
-	;JE display1
-
-	;cmp EAX, 4
-	;JE find1
 	
-	;CALL ReadDec
-
-	;CMP EAX,1
-	;JE Read1
-	
-	;CMP EAX,2
-	;JE display1
-
-	;CMP EAX,3
-	;JE Append1
-
-	;CMP EAX,4
-	
-
-	;CMP EAX,0
-	;JE skip
-	
-	;Read1:
-		;CALL CLRSCR
-		;jmp Start
-
-	;display1:
-		;CALL Display
-		;call crlf
-		;jmp read_Function
-	;Append1:
-		;CALL Append
-		;CALL CRLF
-		;JMP read_Function
-	;skip:
-		;mwrite "End"
-		;CALL CRLF
-		;CALL WaitMsg
-	
-	
-	EXIT
+	exit
 main ENDP
 
 ;-----------------------------------------------------------------------------
@@ -135,7 +80,7 @@ main ENDP
 ;-----------------------------------------------------------------------------
 getHandleHeap PROC
 	;GetProcessHeap , this function will return the address of the heap in EAX.
-	INVOKE heapdestroy, hheap ;#? not used
+	INVOKE HeapDestroy, hHeap ;#? not used
 	INVOKE GetProcessHeap		;#? get handle prog's heap
 	CMP EAX,  0				;#3 if failed,  display message
 	JNE success
@@ -159,7 +104,7 @@ allocateArray PROC       ;this procedure will allocate the heap with size1 and r
 		MOV EAX, 0 ;#5 Cannot allocate memory   - this function will return one if it succedes in allcating the heap
 		JMP quit
 	success:
-		MOV Text, EAX ;#? save the pointer to varible DWORD text
+		MOV Text, EAX ;#? save the pointer to varible DWORD Text
 		MOV EAX, 1  ;#5this function will return one if it succedes in allcating the heap
 	quit:
 	Ret
@@ -173,21 +118,21 @@ allocateArray ENDP
 Read PROC uses EDX,  File_Name:PTR BYTE
 	MOV EDX, File_Name     ;#5CALL openinputfile takes in EDX the address of the file_name since its already a pointer we do not use offset
 	mov path,edx
-	CALL openInputfile    ;#5returns the handle of the file in EAX
+	CALL OpenInputFile    ;#5returns the handle of the file in EAX
 	CMP EAX, INVALID_HANDLE_VALUE
 	jne successOpen
 	MOV EAX, 0
-	mwrite"Fail to open the file"
-	call crlf
+	mWrite"Fail to open the file"
+	call Crlf
 	JMP quit1
 	successOpen:
-	mwrite"success in opening the file"
-	call crlf
+	mWrite"success in opening the file"
+	call Crlf
 	MOV filehandle, EAX    ;#? move the file handle in from EAX nto filehandle handle
 
 	MOV EDX, Text             ;#5PROC readfromfile takes a pointer to the heap to fill it and the maximum size of the reading just just like readstring , it will return in EAX the actual number of bytes that it reads
 	MOV ECX, size1     
-	CALL readfromfile
+	CALL ReadFromFile
 	jnc sucessRead
 	MOV EAX, 0
 	JMP quit
@@ -196,7 +141,7 @@ Read PROC uses EDX,  File_Name:PTR BYTE
    
 	quit:
 	MOV EAX, filehandle  ;#5after reading move the file handle into EAX to close the file
-	CALL closefile
+	CALL CloseFile
 	MOV EAX, 1
 	quit1:
 	Ret
@@ -206,12 +151,12 @@ Read ENDP
 ;Display PROC Apend a string at the last of the heap
 ;-----------------------------------------------------------------------------
 Display PROC USES EDX ESI
-	CMP Text_length, 0
+	CMP Text_Length, 0
 	JE File_Is_Empty
-		MOV EDX, text
-		CALL writestring
+		MOV EDX, Text
+		CALL WriteString
 	File_Is_Empty:
-		CALL CRLF
+		CALL Crlf
 ret
 Display ENDP
 
@@ -220,14 +165,14 @@ Display ENDP
 ;Recieves: 
 ;-----------------------------------------------------------------------------
 Append PROC uses ESI
-;mwrite"Enter the word you want to append : "
+;mWrite"Enter the word you want to append : "
 	MOV ECX, 300
 	MOV EDX, OFFSET apend_word
-	CALL readstring
+	CALL ReadString
 
 	MOV EBX, 0
-	MOV EDX, Text				;#5pinter to text in EDX
-	ADD EDX, Text_Length		;#3ADD the length of the text to make EDX points at the last element in the heap
+	MOV EDX, Text				;#5pinter to Text in EDX
+	ADD EDX, Text_Length		;#3ADD the length of the Text to make EDX points at the last element in the heap
 	MOV ESI, offset apend_word			;#?pointer to the apended word
 	MOV ECX, EAX
 	L:
@@ -243,8 +188,8 @@ Ret
 Append ENDP
 
 ;-----------------------------------------------------------------------------
-;Find PROC Counts number of occurrence of the entered word in the file's text
-;Recieves: 2 offsets parameters text and entered word
+;Find PROC Counts number of occurrence of the entered word in the file's Text
+;Recieves: 2 offsets parameters Text and entered word
 ;Return: Number of occurrence of the word in EAX
 ;-----------------------------------------------------------------------------
 Find PROC USES ESI EDI EDX
@@ -259,31 +204,31 @@ Find PROC USES ESI EDI EDX
 	CALL ReadString
 	MOV oldWord_Length, EAX
 
-	MOV EAX, text
+	MOV EAX, Text
 	MOV Tpos, EAX
 
 	MOV EDX, 0						 ;#5counts number of occurrence of a word 
-	MOV EDI, Tpos					 ;#5ES:DI => text
-	MOV ECX, text_Length			 ;#5ECX = length of text
+	MOV EDI, Tpos					 ;#5ES:DI => Text
+	MOV ECX, Text_Length			 ;#5ECX = length of Text
 	resume:
 		MOV ESI, offset Opos
 		MOV AL, BYTE PTR [ESI]	 ;#2first char of oldWord
 		CLD
-		REPNE SCASB					 ;#2scan until we find it in text
+		REPNE SCASB					 ;#2scan until we find it in Text
 		JNE Find_Finish
-	; found 1st char of oldWord in text 找到了，此时edi指向原文相同字符的下一位置
+	; found 1st char of oldWord in Text 找到了，此时edi指向原文相同字符的下一位置
 			
 			PUSH ECX						  ;#1save count
 			PUSH EDI						  ;#1save pointer
 			MOV ESI, EDI 
 			MOV EDI, offset Opos		  ;#?second character
 			INC EDI
-			MOV ECX, oldWord_Length			  ;#5ECX = length of text - 1
+			MOV ECX, oldWord_Length			  ;#5ECX = length of Text - 1
 			DEC ECX
 			REPE CMPSB						  ;#2edi与esi比较，相等则zf=1，否则zf=0 scan until we find mismatch
 			JNE skip						  ;#2ZF=0,匹配错误，跳转 no mismatch - so we found str2
 				MOV EAX, Tpos
-				ADD EAX, text_Length
+				ADD EAX, Text_Length
 				CMP EAX, ESI
 				JE Check_Space_Before
 					MOV AL, BYTE PTR [ESI]
@@ -352,15 +297,15 @@ Find PROC USES ESI EDI EDX
 			MOV EDX, OFFSET wstr
 			
 			;MOV EAX, EDX
-			mwrite"Bot : "
+			mWrite"Bot : "
 			
-call writestring
+call WriteString
 jmp rtn
 Appe:
-		mwrite "What are you talking about :"
-		;call writestring
+		mWrite "What are you talking about :"
+		;call WriteString
 		call Append
-		call crlf
+		call Crlf
 rtn:
 	Ret
 Find ENDP
