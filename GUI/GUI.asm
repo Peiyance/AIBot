@@ -35,6 +35,13 @@ ButtonTextRobot	BYTE "Robot",0
 ButtonTextHuman	BYTE "Human",0
 
 ;bot
+	;Find函数的设想
+	;EAX传返回值 为是否命中（0 未命中 1命中）
+	szQuery		BYTE "2333", 200 dup(0) ;用户查询的句子存于此 0尾字符串
+	lenQuery	DWORD 4	;szQuery的长度
+	szResponse		BYTE "oo:xx", 200 dup(0) ;Find函数返回的句子存于此 0尾字符串
+	lenResponse	DWORD 5	;szResponse的长度
+	;
 	hHeap				 HANDLE ?  ;handle holding the address of the heap
 	filehandle			 HANDLE ?  
 	Text				 DWORD ?    ;pointer to the allocated heap
@@ -87,7 +94,6 @@ IDM_APPENDTEXT 	equ 2
 
 
 .code
-;extern initialize:proc ;;怪了，就是链接不上。求指教
 
 ;procedure prototypes
 	Read		PROTO, File_Name:PTR BYTE
@@ -348,24 +354,12 @@ Find ENDP
 
 
 main	proc
-	;invoke initialize
-	;
-;
-	;invoke GetModuleHandle, NULL
-	;mov    hInstance,eax
-	;invoke WinMain, hInstance, NULL, NULL, SW_SHOWDEFAULT
-	;invoke ExitProcess,eax
-	;ret
 	invoke initialize
-	read_Function:
-		;CALL waitmsg	
-
-		mWrite "YOU: "
-		CALL Find
-		CALL Crlf
-		JMP read_Function
-
 	
+	invoke GetModuleHandle, NULL
+	mov    hInstance,eax
+	invoke WinMain, hInstance, NULL, NULL, SW_SHOWDEFAULT
+	invoke ExitProcess,eax
 	ret
 main	endp
 
@@ -463,11 +457,11 @@ WndProc proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
 			.ENDIF		
 		.ELSEIF lParam == "R"
 			invoke GetWindowText,TextRobot,ADDR Robot,512
-			invoke szCatStr,addr Robot,addr ButtonTextRobot
+			invoke szCatStr,addr Robot,addr szResponse
 			invoke SetWindowText,TextRobot,ADDR Robot
 		.ELSEIF lParam == "H"
 			invoke GetWindowText,TextHuman,ADDR Human,512
-			invoke szCatStr,addr Human,addr ButtonTextHuman
+			invoke szCatStr,addr Human,addr szQuery
 			invoke SetWindowText,TextHuman,ADDR Human
 		.ELSE
 			.IF ax==ButtonClrID
