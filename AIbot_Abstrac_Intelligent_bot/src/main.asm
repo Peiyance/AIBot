@@ -2,6 +2,12 @@
 .model flat,stdcall
 option casemap:none
 
+include 	windows.inc
+include 	user32.inc
+include 	kernel32.inc
+include		masm32.inc
+include		comctl32.inc
+include		shell32.inc
 INCLUDE IRVINE32.INC
 INCLUDE macros.inc
 
@@ -71,7 +77,7 @@ main PROC
 		JMP read_Function
 
 	
-	exit
+	ret
 main ENDP
 
 ;-----------------------------------------------------------------------------
