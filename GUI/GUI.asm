@@ -41,7 +41,11 @@ ButtonTextHuman	BYTE "Human",0
 	lenQuery	DWORD 4	;szQuery的长度
 	szResponse		BYTE "oo:xx", 200 dup(0) ;Find函数返回的句子存于此 0尾字符串
 	lenResponse	DWORD 5	;szResponse的长度
+	isTraining	DWORD 0 ;上次Find未命中则下次是training
 	;
+	szNotfound			BYTE "What are you talking about?", 0ah, 0
+	szEndLine			BYTE 0ah, 0
+
 	hHeap				 HANDLE ?  ;handle holding the address of the heap
 	filehandle			 HANDLE ?  
 	Text				 DWORD ?    ;pointer to the allocated heap
@@ -78,6 +82,7 @@ ButtonHuman 	HWND ?
 ButtonRobot 	HWND ?
 TextHuman 		HWND ?
 TextRobot 		HWND ?
+hWndTextInput	HWND ?
 Robot 			BYTE 512 dup(0) 
 Human			BYTE 512 dup(0) 
 
@@ -88,6 +93,7 @@ ButtonRobotID equ 2
 ButtonHumanID equ 3
 TextRobotID equ 4
 TextHumanID equ 5
+ID_TEXT equ 6
 
 IDM_CLEAR 		equ 1
 IDM_APPENDTEXT 	equ 2
@@ -208,14 +214,14 @@ Display ENDP
 ;-----------------------------------------------------------------------------
 Append PROC uses ESI
 ;mWrite"Enter the word you want to append : "
-	MOV ECX, 300
-	MOV EDX, OFFSET apend_word
-	CALL ReadString
-
+	;MOV ECX, 300
+	;MOV EDX, OFFSET apend_word
+	;CALL ReadString
+	MOV EAX, lenQuery
 	MOV EBX, 0
 	MOV EDX, Text				;#5pinter to Text in EDX
 	ADD EDX, Text_Length		;#3ADD the length of the Text to make EDX points at the last element in the heap
-	MOV ESI, offset apend_word			;#?pointer to the apended word
+	MOV ESI, offset szQuery			;#?pointer to the apended word
 	MOV ECX, EAX
 	L:
 		MOV bl, BYTE PTR[ESI]
@@ -241,10 +247,10 @@ Find PROC USES ESI EDI EDX
 	;CALL ReadString
 	;MOV oldWord_Length, EAX
 	MOV falg, 0
-	MOV ECX, 300
-	MOV EDX, OFFSET Opos
-	CALL ReadString
-	MOV oldWord_Length, EAX
+	;MOV ECX, 300
+	;MOV EDX, OFFSET Opos
+	;CALL ReadString
+	;MOV oldWord_Length, EAX
 
 	MOV EAX, Text
 	MOV Tpos, EAX
@@ -253,7 +259,7 @@ Find PROC USES ESI EDI EDX
 	MOV EDI, Tpos					 ;#5ES:DI => Text
 	MOV ECX, Text_Length			 ;#5ECX = length of Text
 	resume:
-		MOV ESI, offset Opos
+		MOV ESI, offset szQuery
 		MOV AL, BYTE PTR [ESI]	 ;#2first char of oldWord
 		CLD
 		REPNE SCASB					 ;#2scan until we find it in Text
@@ -263,9 +269,9 @@ Find PROC USES ESI EDI EDX
 			PUSH ECX						  ;#1save count
 			PUSH EDI						  ;#1save pointer
 			MOV ESI, EDI 
-			MOV EDI, offset Opos		  ;#?second character
+			MOV EDI, offset szQuery		  ;#?second character
 			INC EDI
-			MOV ECX, oldWord_Length			  ;#5ECX = length of Text - 1
+			MOV ECX, lenQuery			  ;#5ECX = length of Text - 1
 			DEC ECX
 			REPE CMPSB						  ;#2edi与esi比较，相等则zf=1，否则zf=0 scan until we find mismatch
 			JNE skip						  ;#2ZF=0,匹配错误，跳转 no mismatch - so we found str2
@@ -279,7 +285,7 @@ Find PROC USES ESI EDI EDX
 						CMP AL, 0dh				;#2 checks if there was an ENTER after word
 						JNE skip				;#2 skips this word if there wasn't SPACE nor Enter after it
 				Check_Space_Before:
-						SUB ESI, oldWord_Length ;#3 puts ESI on the first sentence
+						SUB ESI, lenQuery ;#3 puts ESI on the first sentence
 						MOV EAX, Tpos
 						CMP EAX, ESI
 						JE succeed
@@ -296,7 +302,7 @@ Find PROC USES ESI EDI EDX
 				JMP resume					  ;#2resume search
 	; succeed - second string found in first
 		succeed:
-			lea EDI, wstr
+			lea EDI, szResponse
 			lea ESI, cler
 			MOV ECX, 200
 			clar:
@@ -306,14 +312,14 @@ Find PROC USES ESI EDI EDX
 			POP EDI						;#1point to char AFTER 1st match
 			POP ECX
 			DEC EDI
-			MOV ECX, oldWord_Length
+			MOV ECX, lenQuery
 			locat:
 				INC EDI
 			loop locat
 			INC EDI
 			
 			mov ESI, EDI
-			lea EDI, wstr
+			lea EDI, szResponse
 			;movsb
 			;movsb
 			s:
@@ -331,23 +337,26 @@ Find PROC USES ESI EDI EDX
 			;MOVSB
 			fina:
 			MOV falg, 68h
+			MOV EAX, 1
 			JMP Find_Finish
 		Find_Finish:
 			MOV AL, falg
 			CMP AL, 00h
 			JE Appe
-			MOV EDX, OFFSET wstr
+			;MOV EDX, OFFSET wstr
 			
 			;MOV EAX, EDX
-			mWrite"Bot : "
+			;mWrite"Bot : "
 			
-call WriteString
+;call WriteString
 jmp rtn
 Appe:
-		mWrite "What are you talking about :"
+		;mWrite "What are you talking about :"
+		invoke szCopy, offset szNotfound, offset szResponse
+		MOV EAX, 0
 		;call WriteString
-		call Append
-		call Crlf
+		;call Append
+		;call Crlf
 rtn:
 	Ret
 Find ENDP
@@ -413,16 +422,25 @@ WndProc proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
 		invoke PostQuitMessage,NULL
 	.ELSEIF uMsg==WM_CREATE
 		
+		;L text edit
 		invoke CreateWindowEx,WS_EX_CLIENTEDGE, ADDR TextClassName,NULL,\
                         WS_CHILD or WS_VISIBLE or WS_BORDER or ES_WANTRETURN or ES_MULTILINE or ES_AUTOHSCROLL,\
-                        30,100,130,140,hWnd,TextRobotID,hInstance,NULL
+                        30,100,150,110,hWnd,TextRobotID,hInstance,NULL
 		mov  TextRobot,eax
 
+		;R text edit
 		invoke CreateWindowEx,WS_EX_CLIENTEDGE, ADDR TextClassName,NULL,\
                         WS_CHILD or WS_VISIBLE or WS_BORDER or ES_LEFT or\
                         ES_AUTOHSCROLL,\
-                        200,100,130,140,hWnd,TextHumanID,hInstance,NULL
+                        180,100,150,110,hWnd,TextHumanID,hInstance,NULL
 		mov  TextHuman,eax
+
+		;input
+		invoke CreateWindowEx,WS_EX_CLIENTEDGE, ADDR TextClassName,NULL,\
+                        WS_CHILD or WS_VISIBLE or WS_BORDER or ES_LEFT or\
+                        ES_AUTOHSCROLL,\
+                        30,220,300,30,hWnd,ID_TEXT,hInstance,NULL
+		mov  hWndTextInput,eax
 
 		invoke CreateWindowEx,NULL, ADDR ButtonClassName,ADDR ButtonTextClr,\
                         WS_CHILD or WS_VISIBLE or BS_DEFPUSHBUTTON,\
@@ -464,25 +482,46 @@ WndProc proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
 			invoke szCatStr,addr Human,addr szQuery
 			invoke SetWindowText,TextHuman,ADDR Human
 		.ELSE
-			.IF ax==ButtonClrID
+			.IF ax==ButtonClrID ;Clear
 				shr eax,16
 				.IF ax==BN_CLICKED
 					invoke SendMessage,hWnd,WM_COMMAND,IDM_CLEAR,0
 				.ENDIF
-			.ELSEIF ax==ButtonRobotID
+			.ELSEIF ax==ButtonRobotID ;Robot
 				shr eax,16
 				.IF ax==BN_CLICKED
 					invoke SendMessage,hWnd,WM_COMMAND,IDM_APPENDTEXT,"R"
 				.ENDIF
-			.ELSEIF ax==ButtonHumanID
+			.ELSEIF ax==ButtonHumanID ;Human
 				shr eax,16
 				.IF ax==BN_CLICKED
 					invoke SendMessage,hWnd,WM_COMMAND,IDM_APPENDTEXT,"H"
 				.ENDIF
-			.ELSEIF ax==ButtonTrainID
+			.ELSEIF ax==ButtonTrainID ;Train
 				shr eax,16
-				.IF ax==BN_CLICKED
-					invoke SendMessage,hWnd,WM_COMMAND,IDM_APPENDTEXT,"T"
+				.IF ax==BN_CLICKED				
+					;invoke SendMessage,hWnd,WM_COMMAND,IDM_APPENDTEXT,"T"
+					invoke GetWindowText,hWndTextInput,ADDR szQuery,200 ;取出输入框内容 放入szQuery
+					invoke szLen, ADDR szQuery
+					mov lenQuery ,eax
+					invoke GetWindowText,TextHuman,ADDR Human,512
+					invoke szCatStr,addr Human,addr szQuery
+					invoke szCatStr,addr Human,addr szEndLine
+					invoke SetWindowText,TextHuman,ADDR Human
+					.if isTraining==1
+						invoke Append
+						mov isTraining, 0
+					.else
+						invoke Find ;调用Find EAX为是否命中
+						.if EAX==0							
+							mov isTraining, 1
+						.endif
+						invoke GetWindowText,TextRobot,ADDR Robot,512
+						invoke szCatStr,addr Robot,addr szResponse
+						invoke szCatStr,addr Robot,addr szEndLine
+						invoke SetWindowText,TextRobot,ADDR Robot ;响应放入文本框
+					.endif
+
 				.ENDIF
 			.ENDIF
 		.ENDIF
