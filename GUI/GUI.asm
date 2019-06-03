@@ -29,10 +29,20 @@ AppName  		BYTE "Robot",0
 ButtonClassName BYTE "button",0
 TextClassName	BYTE "edit",0
 
-ButtonTextClr 	BYTE "Clear",0
+ButtonTextClr 	BYTE "Reverse",0
 ButtonTextTrain 	BYTE "Train",0
-ButtonTextRobot	BYTE "Robot",0
-ButtonTextHuman	BYTE "Human",0
+ButtonRobot	BYTE "Shift",0
+ButtonHuman	BYTE "Push_c",0
+ButtonStartGame	BYTE "Start",0
+
+szWinText BYTE "您赢了", 0
+
+;game variables
+szTarget BYTE "aabcc", 0
+szInit BYTE "aab", 0
+szCurrent BYTE 200 dup (0)
+szPush BYTE "c",0
+szChar BYTE "x",0
 
 ;bot
 	;Find函数的设想
@@ -43,8 +53,8 @@ ButtonTextHuman	BYTE "Human",0
 	lenResponse	DWORD 5	;szResponse的长度
 	isTraining	DWORD 0 ;上次Find未命中则下次是training
 	;
-	szNotfound			BYTE "What are you talking about?", 0ah, 0
-	szEndLine			BYTE 0ah, 0
+	szNotfound			BYTE "What are you talking about?", 0
+	szEndLine			BYTE 0dh, 0ah, 0
 
 	hHeap				 HANDLE ?  ;handle holding the address of the heap
 	filehandle			 HANDLE ?  
@@ -76,23 +86,25 @@ ButtonTextHuman	BYTE "Human",0
 
 .data?
 hInstance 		HINSTANCE ?
-ButtonTrain		HWND ?
-ButtonClr		HWND ?
-ButtonHuman 	HWND ?
-ButtonRobot 	HWND ?
-TextHuman 		HWND ?
-TextRobot 		HWND ?
-hWndTextInput	HWND ?
-Robot 			BYTE 512 dup(0) 
-Human			BYTE 512 dup(0) 
+hButtonTrain		HWND ?
+hButtonReverse		HWND ?
+hButtonShift 	HWND ?
+hButtonPush 	HWND ?
+hButtonStartGame	HWND ?
+hEditHuman 		HWND ?
+hEditRobot 		HWND ?
+hEditInput	HWND ?
+szRobot 			BYTE 512 dup(0) 
+szHuman			BYTE 512 dup(0) 
 
 .const
-ButtonClrID equ 0
-ButtonTrainID equ 1
-ButtonRobotID equ 2
-ButtonHumanID equ 3
-TextRobotID equ 4
-TextHumanID equ 5
+ID_BUTTON_TRAIN equ 0
+ID_BUTTON_REVERSE equ 1
+ID_BUTTON_SHIFT equ 2
+ID_BUTTON_PUSH equ 3
+ID_BUTTON_STARTGAME equ 7
+ID_EDIT_ROBOT equ 4
+ID_EDIT_USER equ 5
 ID_TEXT equ 6
 
 IDM_CLEAR 		equ 1
@@ -102,8 +114,206 @@ IDM_APPENDTEXT 	equ 2
 .code
 
 ;procedure prototypes
-	Read		PROTO, File_Name:PTR BYTE
-	;Find		PROTO, Opos:PTR BYTE
+initialize PROTO
+winCheck PROTO
+getHandleHeap PROTO
+allocateArray PROTO
+Read PROTO, File_Name:PTR BYTE
+Append PROTO
+Find PROTO
+
+
+main	proc
+	invoke initialize
+	
+	invoke GetModuleHandle, NULL
+	mov    hInstance,eax
+	invoke WinMain, hInstance, NULL, NULL, SW_SHOWDEFAULT
+	invoke ExitProcess,eax
+	ret
+main	endp
+
+
+WinMain proc hInst:HINSTANCE, hPrevInst:HINSTANCE, CmdLine:LPSTR, CmdShow:DWORD	
+	; 局部变量  窗体类 消息变量  窗口句柄
+	local wc:WNDCLASSEX
+	local msg:MSG
+	local hwnd:HWND
+	mov   wc.cbSize,SIZEOF WNDCLASSEX
+	mov   wc.style, CS_HREDRAW or CS_VREDRAW
+	mov   wc.lpfnWndProc, OFFSET WndProc
+	mov   wc.cbClsExtra,NULL
+	mov   wc.cbWndExtra,NULL
+	push  hInst
+	pop   wc.hInstance
+	mov   wc.hbrBackground, COLOR_WINDOW
+	mov   wc.lpszClassName,OFFSET ClassName
+	invoke LoadIcon,NULL,IDI_APPLICATION
+	mov   wc.hIcon,eax
+	mov   wc.hIconSm,eax
+	invoke LoadCursor,NULL,IDC_ARROW
+	mov   wc.hCursor,eax
+
+	invoke RegisterClassEx, ADDR wc
+	invoke CreateWindowEx,  WS_EX_CLIENTEDGE,  ADDR ClassName,  ADDR AppName,\
+           WS_OVERLAPPEDWINDOW,\
+		   CW_USEDEFAULT, CW_USEDEFAULT,\
+		   600,400,\
+		   NULL,NULL,\
+           hInstance,NULL
+	mov   hwnd,eax
+
+	invoke ShowWindow, hwnd, SW_SHOWNORMAL
+	invoke UpdateWindow, hwnd
+
+	.WHILE TRUE
+                invoke GetMessage, ADDR msg,NULL,0,0
+                .BREAK .IF (!eax)
+                invoke TranslateMessage, ADDR msg
+                invoke DispatchMessage, ADDR msg
+	.ENDW
+	mov     eax,msg.wParam
+	ret
+WinMain endp
+
+
+;窗口的回调函数 处理窗口响应事件  hWnd是窗口句柄 uMsg是窗口事件分类  lParam是附加信息
+WndProc proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
+	.IF uMsg==WM_DESTROY
+		invoke PostQuitMessage,NULL
+	.ELSEIF uMsg==WM_CREATE
+		
+		;L text edit
+		invoke CreateWindowEx,WS_EX_CLIENTEDGE, ADDR TextClassName,NULL,\
+                        WS_CHILD or WS_VISIBLE or WS_BORDER or ES_WANTRETURN or ES_MULTILINE or ES_AUTOHSCROLL or ES_MULTILINE,\
+                        30,100,150,110,hWnd,ID_EDIT_ROBOT,hInstance,NULL
+		mov  hEditRobot,eax
+
+		;R text edit
+		invoke CreateWindowEx,WS_EX_CLIENTEDGE, ADDR TextClassName,NULL,\
+                        WS_CHILD or WS_VISIBLE or WS_BORDER or ES_LEFT or\
+                        ES_AUTOHSCROLL or ES_MULTILINE,\
+                        180,100,150,110,hWnd,ID_EDIT_USER,hInstance,NULL
+		mov  hEditHuman,eax
+
+		;input
+		invoke CreateWindowEx,WS_EX_CLIENTEDGE, ADDR TextClassName,NULL,\
+                        WS_CHILD or WS_VISIBLE or WS_BORDER or ES_LEFT or\
+                        ES_AUTOHSCROLL,\
+                        30,220,300,30,hWnd,ID_TEXT,hInstance,NULL
+		mov  hEditInput,eax
+
+		;submit
+		invoke CreateWindowEx,NULL, ADDR ButtonClassName,ADDR ButtonTextTrain,\
+                        WS_CHILD or WS_VISIBLE or BS_DEFPUSHBUTTON,\
+                        340,220,60,30,hWnd, ID_BUTTON_TRAIN, hInstance,NULL
+		mov  hButtonTrain,eax
+
+		;reverse
+		invoke CreateWindowEx,NULL, ADDR ButtonClassName,ADDR ButtonTextClr,\
+                        WS_CHILD or WS_VISIBLE or BS_DEFPUSHBUTTON,\
+                        30,250,60,30,hWnd, ID_BUTTON_REVERSE, hInstance,NULL
+		mov  hButtonReverse,eax		
+
+		;shift
+		invoke CreateWindowEx,NULL, ADDR ButtonClassName,ADDR ButtonRobot,\
+                        WS_CHILD or WS_VISIBLE or BS_DEFPUSHBUTTON,\
+                        130,250,60,30,hWnd, ID_BUTTON_SHIFT, hInstance,NULL
+		mov  hButtonPush,eax
+
+		;push_c
+		invoke CreateWindowEx,NULL, ADDR ButtonClassName,ADDR ButtonHuman,\
+                        WS_CHILD or WS_VISIBLE or BS_DEFPUSHBUTTON,\
+                        230,250,60,30,hWnd, ID_BUTTON_PUSH, hInstance,NULL
+		mov  hButtonShift,eax
+
+		;start game
+		invoke CreateWindowEx,NULL, ADDR ButtonClassName,ADDR ButtonStartGame,\
+                        WS_CHILD or WS_VISIBLE or BS_DEFPUSHBUTTON,\
+                        330,250,60,30,hWnd, ID_BUTTON_STARTGAME, hInstance,NULL
+		mov  hButtonStartGame,eax
+
+	.ELSEIF uMsg==WM_COMMAND
+		mov eax,wParam
+		.IF ax==ID_BUTTON_REVERSE ;#reverse
+			shr eax,16
+			.IF ax==BN_CLICKED
+				;点reverse按钮时将current逆序
+				invoke szRev, addr szCurrent, addr szHuman ;反正szHuman没用着，当中间缓冲吧
+				invoke szCopy, addr szHuman, addr szCurrent
+				invoke SetWindowText,hEditHuman,ADDR szCurrent ;更新当前字串
+				invoke winCheck
+			.ENDIF
+		.ELSEIF ax==ID_BUTTON_SHIFT ;#shift
+			shr eax,16
+			.IF ax==BN_CLICKED
+				;循环左移
+				mov al, szCurrent
+				mov szChar, al
+				invoke szCopy, addr szCurrent+1, addr szHuman
+				invoke szCatStr, addr szHuman, addr szChar
+				invoke szCopy, addr szHuman, addr szCurrent
+				invoke SetWindowText,hEditHuman,ADDR szCurrent ;更新当前字串
+				invoke winCheck
+			.ENDIF
+		.ELSEIF ax==ID_BUTTON_PUSH ;#push
+			shr eax,16
+			.IF ax==BN_CLICKED
+				invoke szCatStr,addr szCurrent,addr szPush
+				invoke SetWindowText,hEditHuman,ADDR szCurrent ;更新当前字串
+				invoke winCheck
+			.ENDIF
+		.ELSEIF ax==ID_BUTTON_TRAIN ;#?Train
+			shr eax,16
+			.IF ax==BN_CLICKED				
+				
+				invoke GetWindowText,hEditInput,ADDR szQuery,200 ;#?取出输入框内容 放入szQuery
+				invoke szLen, ADDR szQuery
+				mov lenQuery ,eax
+				invoke GetWindowText,hEditHuman,ADDR szHuman,512
+				invoke szCatStr,addr szHuman,addr szQuery
+				invoke szCatStr,addr szHuman,addr szEndLine
+				invoke szCatStr,addr szHuman,addr szEndLine
+				invoke SetWindowText,hEditHuman,ADDR szHuman
+				.if isTraining==1
+					invoke Append
+					mov isTraining, 0
+					mov szChar, 0
+					invoke szCopy, addr szChar, addr szResponse ;清空response
+				.else
+					invoke Find ;#?调用Find EAX为是否命中
+					.if EAX==0							
+						mov isTraining, 1
+					.endif
+				.endif
+				invoke GetWindowText,hEditRobot,ADDR szRobot,512
+				invoke szCatStr,addr szRobot,addr szEndLine
+				invoke szCatStr,addr szRobot,addr szResponse
+				invoke szCatStr,addr szRobot,addr szEndLine
+				invoke SetWindowText,hEditRobot,ADDR szRobot ;#?响应放入文本框
+				
+			.ENDIF
+		.ELSEIF ax==ID_BUTTON_STARTGAME ;#startGame
+			shr eax,16
+			.IF ax==BN_CLICKED
+				;clear and set text
+				invoke szCopy,addr szTarget,addr szRobot
+				invoke szCopy,addr szInit,addr szCurrent
+				invoke SetWindowText,hEditRobot,ADDR szRobot ;题面
+				invoke SetWindowText,hEditHuman,ADDR szCurrent ;初始
+			.ENDIF
+
+
+		.ENDIF
+
+	.ELSE
+		invoke DefWindowProc,hWnd,uMsg,wParam,lParam
+		ret
+	.ENDIF
+	xor    eax,eax
+	ret
+WndProc endp
+
 
 initialize proc
 	call getHandleHeap
@@ -118,6 +328,15 @@ initialize proc
 	ret
 initialize endp
 
+winCheck proc
+	invoke szCmp, addr szCurrent, addr szTarget
+	.if eax!=0
+		invoke GetWindowText,hEditRobot,ADDR szRobot,512
+		invoke szCatStr,addr szRobot,addr szEndLine
+		invoke szCatStr,addr szRobot,addr szWinText
+		invoke SetWindowText,hEditRobot,ADDR szRobot ;显示“您赢了”
+	.endif
+winCheck endp
 
 ;-----------------------------------------------------------------------------
 ;getHandleHeap PROC get a handle of the heap
@@ -195,18 +414,6 @@ Read PROC uses EDX,  File_Name:PTR BYTE
 Read ENDP
 
 
-;-----------------------------------------------------------------------------
-;Display PROC Apend a string at the last of the heap
-;-----------------------------------------------------------------------------
-Display PROC USES EDX ESI
-	CMP Text_Length, 0
-	JE File_Is_Empty
-		MOV EDX, Text
-		CALL WriteString
-	File_Is_Empty:
-		CALL Crlf
-ret
-Display ENDP
 
 ;-----------------------------------------------------------------------------
 ;Append PROC Apend a string at the last of the heap
@@ -362,174 +569,5 @@ rtn:
 Find ENDP
 
 
-main	proc
-	invoke initialize
-	
-	invoke GetModuleHandle, NULL
-	mov    hInstance,eax
-	invoke WinMain, hInstance, NULL, NULL, SW_SHOWDEFAULT
-	invoke ExitProcess,eax
-	ret
-main	endp
-
-
-WinMain proc hInst:HINSTANCE, hPrevInst:HINSTANCE, CmdLine:LPSTR, CmdShow:DWORD	
-	; 局部变量  窗体类 消息变量  窗口句柄
-	local wc:WNDCLASSEX
-	local msg:MSG
-	local hwnd:HWND
-	mov   wc.cbSize,SIZEOF WNDCLASSEX
-	mov   wc.style, CS_HREDRAW or CS_VREDRAW
-	mov   wc.lpfnWndProc, OFFSET WndProc
-	mov   wc.cbClsExtra,NULL
-	mov   wc.cbWndExtra,NULL
-	push  hInst
-	pop   wc.hInstance
-	mov   wc.hbrBackground, COLOR_WINDOW
-	mov   wc.lpszClassName,OFFSET ClassName
-	invoke LoadIcon,NULL,IDI_APPLICATION
-	mov   wc.hIcon,eax
-	mov   wc.hIconSm,eax
-	invoke LoadCursor,NULL,IDC_ARROW
-	mov   wc.hCursor,eax
-
-	invoke RegisterClassEx, ADDR wc
-	invoke CreateWindowEx,  WS_EX_CLIENTEDGE,  ADDR ClassName,  ADDR AppName,\
-           WS_OVERLAPPEDWINDOW,\
-		   CW_USEDEFAULT, CW_USEDEFAULT,\
-		   400,300,\
-		   NULL,NULL,\
-           hInstance,NULL
-	mov   hwnd,eax
-
-	invoke ShowWindow, hwnd, SW_SHOWNORMAL
-	invoke UpdateWindow, hwnd
-
-	.WHILE TRUE
-                invoke GetMessage, ADDR msg,NULL,0,0
-                .BREAK .IF (!eax)
-                invoke TranslateMessage, ADDR msg
-                invoke DispatchMessage, ADDR msg
-	.ENDW
-	mov     eax,msg.wParam
-	ret
-WinMain endp
-
-
-;窗口的回调函数 处理窗口响应事件  hWnd是窗口句柄 uMsg是窗口事件分类  lParam是附加信息
-WndProc proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
-	.IF uMsg==WM_DESTROY
-		invoke PostQuitMessage,NULL
-	.ELSEIF uMsg==WM_CREATE
-		
-		;L text edit
-		invoke CreateWindowEx,WS_EX_CLIENTEDGE, ADDR TextClassName,NULL,\
-                        WS_CHILD or WS_VISIBLE or WS_BORDER or ES_WANTRETURN or ES_MULTILINE or ES_AUTOHSCROLL,\
-                        30,100,150,110,hWnd,TextRobotID,hInstance,NULL
-		mov  TextRobot,eax
-
-		;R text edit
-		invoke CreateWindowEx,WS_EX_CLIENTEDGE, ADDR TextClassName,NULL,\
-                        WS_CHILD or WS_VISIBLE or WS_BORDER or ES_LEFT or\
-                        ES_AUTOHSCROLL,\
-                        180,100,150,110,hWnd,TextHumanID,hInstance,NULL
-		mov  TextHuman,eax
-
-		;input
-		invoke CreateWindowEx,WS_EX_CLIENTEDGE, ADDR TextClassName,NULL,\
-                        WS_CHILD or WS_VISIBLE or WS_BORDER or ES_LEFT or\
-                        ES_AUTOHSCROLL,\
-                        30,220,300,30,hWnd,ID_TEXT,hInstance,NULL
-		mov  hWndTextInput,eax
-
-		invoke CreateWindowEx,NULL, ADDR ButtonClassName,ADDR ButtonTextClr,\
-                        WS_CHILD or WS_VISIBLE or BS_DEFPUSHBUTTON,\
-                        30,10,60,30,hWnd, ButtonClrID, hInstance,NULL
-		mov  ButtonClr,eax
-
-		invoke CreateWindowEx,NULL, ADDR ButtonClassName,ADDR ButtonTextTrain,\
-                        WS_CHILD or WS_VISIBLE or BS_DEFPUSHBUTTON,\
-                        200,10,60,30,hWnd, ButtonTrainID, hInstance,NULL
-		mov  ButtonTrain,eax
-
-		invoke CreateWindowEx,NULL, ADDR ButtonClassName,ADDR ButtonTextRobot,\
-                        WS_CHILD or WS_VISIBLE or BS_DEFPUSHBUTTON,\
-                        30,50,60,30,hWnd, ButtonRobotID, hInstance,NULL
-		mov  ButtonRobot,eax
-
-		invoke CreateWindowEx,NULL, ADDR ButtonClassName,ADDR ButtonTextHuman,\
-                        WS_CHILD or WS_VISIBLE or BS_DEFPUSHBUTTON,\
-                        200,50,60,30,hWnd, ButtonHumanID, hInstance,NULL
-		mov  ButtonHuman,eax
-
-		;invoke SetWindowText,TextHuman, ADDR ButtonTextHuman
-
-	.ELSEIF uMsg==WM_COMMAND
-		mov eax,wParam
-		.IF lParam==0
-			.IF ax==IDM_CLEAR
-				invoke SetWindowText,TextRobot,NULL
-				invoke SetWindowText,TextHuman,NULL
-			.ELSE
-				invoke DestroyWindow,hWnd
-			.ENDIF		
-		.ELSEIF lParam == "R"
-			invoke GetWindowText,TextRobot,ADDR Robot,512
-			invoke szCatStr,addr Robot,addr szResponse
-			invoke SetWindowText,TextRobot,ADDR Robot
-		.ELSEIF lParam == "H"
-			invoke GetWindowText,TextHuman,ADDR Human,512
-			invoke szCatStr,addr Human,addr szQuery
-			invoke SetWindowText,TextHuman,ADDR Human
-		.ELSE
-			.IF ax==ButtonClrID ;Clear
-				shr eax,16
-				.IF ax==BN_CLICKED
-					invoke SendMessage,hWnd,WM_COMMAND,IDM_CLEAR,0
-				.ENDIF
-			.ELSEIF ax==ButtonRobotID ;Robot
-				shr eax,16
-				.IF ax==BN_CLICKED
-					invoke SendMessage,hWnd,WM_COMMAND,IDM_APPENDTEXT,"R"
-				.ENDIF
-			.ELSEIF ax==ButtonHumanID ;Human
-				shr eax,16
-				.IF ax==BN_CLICKED
-					invoke SendMessage,hWnd,WM_COMMAND,IDM_APPENDTEXT,"H"
-				.ENDIF
-			.ELSEIF ax==ButtonTrainID ;Train
-				shr eax,16
-				.IF ax==BN_CLICKED				
-					;invoke SendMessage,hWnd,WM_COMMAND,IDM_APPENDTEXT,"T"
-					invoke GetWindowText,hWndTextInput,ADDR szQuery,200 ;取出输入框内容 放入szQuery
-					invoke szLen, ADDR szQuery
-					mov lenQuery ,eax
-					invoke GetWindowText,TextHuman,ADDR Human,512
-					invoke szCatStr,addr Human,addr szQuery
-					invoke szCatStr,addr Human,addr szEndLine
-					invoke SetWindowText,TextHuman,ADDR Human
-					.if isTraining==1
-						invoke Append
-						mov isTraining, 0
-					.else
-						invoke Find ;调用Find EAX为是否命中
-						.if EAX==0							
-							mov isTraining, 1
-						.endif
-						invoke GetWindowText,TextRobot,ADDR Robot,512
-						invoke szCatStr,addr Robot,addr szResponse
-						invoke szCatStr,addr Robot,addr szEndLine
-						invoke SetWindowText,TextRobot,ADDR Robot ;响应放入文本框
-					.endif
-
-				.ENDIF
-			.ENDIF
-		.ENDIF
-	.ELSE
-		invoke DefWindowProc,hWnd,uMsg,wParam,lParam
-		ret
-	.ENDIF
-	xor    eax,eax
-	ret
-WndProc endp
 end main
+
