@@ -27,6 +27,8 @@ initialize PROTO
 winCheck PROTO
 getHandleHeap PROTO
 allocateArray PROTO
+showStackNumbers proto
+add1 proto :DWORD
 Read PROTO, File_Name:PTR BYTE
 Append PROTO
 Find PROTO
@@ -49,11 +51,21 @@ szPush1 BYTE "Push_c",0
 szPush2 BYTE "*",0
 
 ;game variables
+iMode dword 1
+
 szTarget BYTE "aabcc", 0
 szInit BYTE "aab", 0
 szCurrent BYTE 200 dup (0)
 szPush BYTE "c",0
 szChar BYTE "x",0
+szBuf BYTE 20 dup (0)
+
+nums dword 4
+nums4 dword 8,5,5,4
+nums3 dword 0,0,0
+nums2 dword 0,0
+nums1 dword 0
+numTarget dword -6
 
 ;bot
 	;Find函数的设想
@@ -116,6 +128,7 @@ ID_BUTTON_TRAIN equ 1007
 ID_BUTTON_REVERSE equ 1004
 ID_BUTTON_SHIFT equ 1005
 ID_BUTTON_PUSH equ 1006
+ID_BUTTON_PUSH2 equ 1010 ;undo
 ID_BUTTON_STARTGAME equ 1008
 ID_EDIT_ROBOT equ 1001
 ID_EDIT_USER equ 1002
@@ -242,20 +255,26 @@ WndProc proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
 			invoke SetWindowText,hButtonReverse,ADDR szReverse1 ;更改游戏按钮文字
 			invoke SetWindowText,hButtonShift,ADDR szShift1
 			invoke SetWindowText,hButtonPush,ADDR szPush1
+			mov iMode, 1
 		.elseif eax== IDC_RADIO2 ;单选框2
 			invoke SetWindowText,hButtonReverse,ADDR szReverse2 ;更改游戏按钮文字
 			invoke SetWindowText,hButtonShift,ADDR szShift2
 			invoke SetWindowText,hButtonPush,ADDR szPush2
-		.elseif eax == ID_BUTTON_REVERSE ;#reverse
+			mov iMode, 2
+		.elseif eax == ID_BUTTON_REVERSE ;#reverse, +
+				.if iMode == 1
+					;点reverse按钮时将current逆序
+					invoke szRev, addr szCurrent, addr szHuman ;反正szHuman没用着，当中间缓冲吧
+					invoke szCopy, addr szHuman, addr szCurrent
+					invoke SetWindowText,hEditHuman,ADDR szCurrent ;更新当前字串
+					invoke winCheck
+				.elseif iMode == 2
+					;stack数字游戏, +
+					invoke add1, 1
+				.endif
 
-				;点reverse按钮时将current逆序
-				invoke szRev, addr szCurrent, addr szHuman ;反正szHuman没用着，当中间缓冲吧
-				invoke szCopy, addr szHuman, addr szCurrent
-				invoke SetWindowText,hEditHuman,ADDR szCurrent ;更新当前字串
-				invoke winCheck
-
-		.ELSEIF eax==ID_BUTTON_SHIFT ;#shift
-
+		.ELSEIF eax==ID_BUTTON_SHIFT ;#shift, -
+			.if iMode == 1
 				;循环左移
 				mov al, szCurrent
 				mov szChar, al
@@ -264,13 +283,25 @@ WndProc proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
 				invoke szCopy, addr szHuman, addr szCurrent
 				invoke SetWindowText,hEditHuman,ADDR szCurrent ;更新当前字串
 				invoke winCheck
+			.elseif iMode == 2
+					;stack数字游戏, -
+					invoke add1, 2
+			.endif
 
-		.ELSEIF eax==ID_BUTTON_PUSH ;#push
-
+		.ELSEIF eax==ID_BUTTON_PUSH ;#push, *
+			.if iMode == 1
 				invoke szCatStr,addr szCurrent,addr szPush
 				invoke SetWindowText,hEditHuman,ADDR szCurrent ;更新当前字串
 				invoke winCheck
-
+			.elseif iMode == 2
+					;stack数字游戏, -
+					invoke add1, 3
+			.endif
+		.elseif eax == ID_BUTTON_PUSH2 ;UNDO
+			.if nums<4
+				inc nums
+				invoke showStackNumbers
+			.endif
 		.ELSEIF eax==ID_BUTTON_TRAIN ;#?Train
 
 				invoke GetWindowText,hEditInput,ADDR szQuery,200 ;#?取出输入框内容 放入szQuery
@@ -299,12 +330,18 @@ WndProc proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
 				invoke SetWindowText,hEditRobot,ADDR szRobot ;#?响应放入文本框
 				
 		.ELSEIF eax==ID_BUTTON_STARTGAME ;#startGame
-
+			.if iMode == 1
 				;clear and set text
 				invoke szCopy,addr szTarget,addr szRobot
 				invoke szCopy,addr szInit,addr szCurrent
 				invoke SetWindowText,hEditRobot,ADDR szRobot ;题面
 				invoke SetWindowText,hEditHuman,ADDR szCurrent ;初始
+			.elseif iMode == 2
+				invoke dwtoa, numTarget, addr szBuf
+				invoke SetWindowText,hEditRobot,ADDR szBuf ;题面
+				mov nums , 4
+				invoke showStackNumbers
+			.endif
 
 		.ENDIF
 
@@ -316,6 +353,105 @@ WndProc proc hWnd:HWND, uMsg:UINT, wParam:WPARAM, lParam:LPARAM
 	xor    eax,eax
 	ret
 WndProc endp
+
+showStackNumbers proc
+	.if nums == 4
+		invoke dwtoa, [nums4+0*4], addr szBuf
+				invoke szCopy,addr szBuf,addr szCurrent
+				invoke szCatStr,addr szCurrent,addr szEndLine
+				invoke dwtoa, [nums4+1*4], addr szBuf
+				invoke szCatStr,addr szCurrent, addr szBuf
+				invoke szCatStr,addr szCurrent,addr szEndLine
+				invoke dwtoa, [nums4+2*4], addr szBuf
+				invoke szCatStr,addr szCurrent, addr szBuf
+				invoke szCatStr,addr szCurrent,addr szEndLine
+				invoke dwtoa, [nums4+3*4], addr szBuf
+				invoke szCatStr,addr szCurrent, addr szBuf
+				invoke SetWindowText,hEditHuman,ADDR szCurrent ;显示
+	.elseif nums==3
+		invoke dwtoa, [nums3+0*4], addr szBuf
+				invoke szCopy,addr szBuf,addr szCurrent
+				invoke szCatStr,addr szCurrent,addr szEndLine
+				invoke dwtoa, [nums3+1*4], addr szBuf
+				invoke szCatStr,addr szCurrent, addr szBuf
+				invoke szCatStr,addr szCurrent,addr szEndLine
+				invoke dwtoa, [nums3+2*4], addr szBuf
+				invoke szCatStr,addr szCurrent, addr szBuf
+				invoke SetWindowText,hEditHuman,ADDR szCurrent ;显示
+	.elseif nums==2
+		invoke dwtoa, [nums2+0*4], addr szBuf
+				invoke szCopy,addr szBuf,addr szCurrent
+				invoke szCatStr,addr szCurrent,addr szEndLine
+				invoke dwtoa, [nums2+1*4], addr szBuf
+				invoke szCatStr,addr szCurrent, addr szBuf
+				invoke SetWindowText,hEditHuman,ADDR szCurrent ;显示
+	.elseif nums==1
+		invoke dwtoa, [nums1+0*4], addr szBuf
+				invoke szCopy,addr szBuf,addr szCurrent
+				invoke SetWindowText,hEditHuman,ADDR szCurrent ;显示
+	.endif
+	ret
+showStackNumbers endp
+
+add1 proc op:dword
+.if nums == 4
+						;4->3
+						mov nums, 3
+						mov eax, [nums4+0*4]
+						.if op==1 ; add
+							add eax, [nums4+1*4]
+						.elseif op==2 ;sub
+							sub eax, [nums4+1*4]
+						.elseif op==3 ;mul
+							mov ebx, [nums4+1*4]
+							imul eax, ebx
+						.endif
+						mov nums3, eax
+						mov eax, [nums4+2*4]
+						mov [nums3+1*4], eax
+						mov eax, [nums4+3*4]
+						mov [nums3+2*4], eax
+					.elseif nums ==3
+						;3->2
+						mov nums, 2
+						mov eax, nums3
+						.if op==1 ; add
+							add eax, [nums3+1*4]
+						.elseif op==2 ;sub
+							sub eax, [nums3+1*4]
+						.elseif op==3 ;mul
+							mov ebx, [nums3+1*4]
+							imul eax, ebx
+						.endif
+						mov nums2, eax
+						mov eax, [nums3+2*4]
+						mov [nums2+1*4], eax
+					.elseif nums==2
+						;2->1 
+						mov nums, 1
+						mov eax, nums2
+						.if op==1 ; add
+							add eax, [nums2+1*4]
+						.elseif op==2 ;sub
+							sub eax, [nums2+1*4]
+						.elseif op==3 ;mul
+							mov ebx, [nums2+1*4]
+							imul eax, ebx
+						.endif
+						mov nums1, eax
+
+						.if eax==numTarget
+							;显示“您赢了”
+							invoke GetWindowText,hEditRobot,ADDR szRobot,512
+							invoke szCatStr,addr szRobot,addr szEndLine
+							invoke szCatStr,addr szRobot,addr szWinText
+							invoke SetWindowText,hEditRobot,ADDR szRobot
+						.endif
+					.endif
+
+					invoke showStackNumbers
+	ret
+add1 endp
 
 
 initialize proc
@@ -339,6 +475,7 @@ winCheck proc
 		invoke szCatStr,addr szRobot,addr szWinText
 		invoke SetWindowText,hEditRobot,ADDR szRobot ;显示“您赢了”
 	.endif
+	ret
 winCheck endp
 
 ;-----------------------------------------------------------------------------

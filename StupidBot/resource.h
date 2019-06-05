@@ -11,8 +11,10 @@
 #define ID_BUTTON_TRAIN                 1007
 #define ID_BUTTON_STARTGAME             1008
 #define ID_TEXT                         1009
+#define ID_BUTTON_PUSH2                 1010
 #define IDC_RADIO1                      1011
 #define IDC_RADIO2                      1012
+#define ID_BUTTON_PUSH3                 1013
 
 // Next default values for new objects
 // 
